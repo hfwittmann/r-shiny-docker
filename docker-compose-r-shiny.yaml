@@ -1,0 +1,38 @@
+version: '3.1'
+
+services:
+
+  https-portal:
+    image: steveltn/https-portal:1
+    ports:
+      - '80:80'
+      - '443:443'
+    links:
+      - shiny
+    restart: always
+    environment:
+      DOMAINS: 'shiny.example.com -> http://shiny'
+      STAGE:  staging # production # local #
+      FORCE_RENEW: 'false'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  
+  shiny:
+    build:
+      context: ./build
+      dockerfile: myDockerfile
+    # image: rocker/shiny
+    container_name: shiny
+    restart: always
+    environment:
+      - VIRTUAL_HOST=shiny.example.com
+    volumes:
+      - /shiny_deploy_apps/:/srv/shiny-server/
+      - shinylog:/var/log/
+      - shinyhome:/home/shiny/
+
+volumes:
+  db_data:
+  upload:
+  shinylog:
+  shinyhome:

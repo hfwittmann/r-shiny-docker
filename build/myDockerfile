@@ -1,0 +1,42 @@
+FROM rocker/shiny:latest
+
+# Install dependencies and Download and install shiny server
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y cron && \
+    apt-get install -y -t unstable && \
+    apt-get install -y libssl-dev libxml2-dev r-cran-testthat r-cran-lubridate # these are necessary for the R-packages htmltab, devtools
+
+# Install r-package packman for better package installation handling
+# cf. https://stackoverflow.com/questions/4090169/elegant-way-to-check-for-missing-packages-and-install-them
+
+RUN echo ' list.of.packages <- c("git2r", "devtools", "install.load") ' > /tmp/packages.R && \
+    echo ' new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])] ' >> /tmp/packages.R && \
+    echo ' if(length(new.packages)) install.packages(new.packages) ' >> /tmp/packages.R && \
+    Rscript /tmp/packages.R
+
+# Now use devtools and install.load to install packages, # note the > for creating the file, # note the >> for appending the file
+RUN  echo " library(devtools) " > /tmp/packages.R && \
+     echo " library(install.load) " >> /tmp/packages.R && \
+     echo " install_load('quantmod', 'PerformanceAnalytics', 'htmltab', 'devtools') " >> /tmp/packages.R && \
+     echo " devtools::install_github('jbryer/DataCache') " >> /tmp/packages.R && \
+     Rscript /tmp/packages.R
+
+
+# https://stackoverflow.com/questions/37458287/how-to-run-a-cron-job-inside-a-docker-container
+
+# Add crontab file in the cron directory
+ADD crontab /etc/cron.d/hello-cron
+
+# Give execution rights on the cron job
+RUN chmod 0644 /etc/cron.d/hello-cron
+
+# Create the log file to be able to run tail
+RUN touch /var/log/cron.log
+
+# Run the command on container startup
+CMD cron && tail -f /var/log/cron.log
+
+EXPOSE 3838
+CMD ["/usr/bin/shiny-server.sh"]
+
